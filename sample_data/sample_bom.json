@@ -1,0 +1,24 @@
+[
+  {
+    "incident_id": "12345",
+    "title": "Road Closure - Bruce Hwy",
+    "description": "Flooding between Townsville and Ingham.",
+    "status": "Active",
+    "start": "2025-08-10T08:30:00",
+    "end": "2025-08-11T12:00:00",
+    "location": "Bruce Hwy, QLD",
+    "region": "North Queensland",
+    "severity": "High"
+  },
+  {
+    "incident_id": "67890",
+    "title": "Lane Closure - Gateway Mwy",
+    "description": "Planned maintenance southbound.",
+    "status": "Planned",
+    "start": "2025-08-12T21:00:00",
+    "end": "2025-08-13T05:00:00",
+    "location": "Gateway Motorway, Brisbane",
+    "region": "Brisbane",
+    "severity": "Moderate"
+  }
+]
