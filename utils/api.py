@@ -1,26 +1,25 @@
+# utils/api.py
 import requests
-import json
 
-# Queensland Gov open data URLs
-INCIDENTS_URL = "https://data.qld.gov.au/api/3/action/datastore_search?resource_id=3d4d3f1b-62f5-4c8f-85cd-3e4e1f7f4cf6"
-ROADWORKS_URL = "https://data.qld.gov.au/api/3/action/datastore_search?resource_id=d07c8e6e-4130-4c8f-8bfc-21ffbf3d6b65"
+def fetch_bom_incidents():
+    """
+    Fetch live BOM QLD Road Incidents.
+    Falls back to raising exception if HTTP error occurs.
+    """
+    BOM_INCIDENTS_URL = "https://www.data.qld.gov.au/api/3/action/datastore_search"
+    RESOURCE_ID = "3d4d3f1b-62f5-4c8f-85cd-3e4e1f7f4cf6"  # QLD Road Incidents
+    params = {
+        "resource_id": RESOURCE_ID,
+        "limit": 500
+    }
 
-def fetch_qld_incidents():
-    """Fetch live traffic incidents from Queensland Open Data."""
-    try:
-        resp = requests.get(INCIDENTS_URL, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        return data
-    except Exception as e:
-        raise RuntimeError(f"BOM QLD Incidents fetch failed: {e}")
+    resp = requests.get(BOM_INCIDENTS_URL, params=params, timeout=10)
+    resp.raise_for_status()
 
-def fetch_qld_roadworks():
-    """Fetch live roadworks from Queensland Open Data."""
-    try:
-        resp = requests.get(ROADWORKS_URL, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        return data
-    except Exception as e:
-        raise RuntimeError(f"BOM QLD Roadworks fetch failed: {e}")
+    data = resp.json()
+
+    if not data.get("success") or "result" not in data:
+        raise ValueError("Invalid response from BOM API")
+
+    return data["result"]["records"]
+
