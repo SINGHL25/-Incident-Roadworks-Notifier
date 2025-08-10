@@ -1,1 +1,26 @@
 
+[
+  {
+    "id": "qld-1",
+    "title": "Roadworks on Smith Ave",
+    "description": "Maintenance works causing lane closure.",
+    "latitude": -27.4698,
+    "longitude": 153.0251,
+    "severity": "low",
+    "start_time": "2025-08-09T08:00:00Z",
+    "end_time": "2025-08-09T18:00:00Z",
+    "type": "roadworks",
+    "source": "QLD-sample"
+  },
+  {
+    "id": "qld-2",
+    "title": "Accident A2 motorway",
+    "description": "Crash blocking two lanes. Emergency services on scene.",
+    "latitude": -27.5,
+    "longitude": 153.0,
+    "severity": "high",
+    "start_time": "2025-08-09T06:30:00Z",
+    "type": "accident",
+    "source": "QLD-sample"
+  }
+]
