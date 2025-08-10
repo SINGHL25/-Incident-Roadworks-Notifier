@@ -1,64 +1,51 @@
 import pandas as pd
-from typing import List, Dict
 
-
-def normalize_incidents(raw: List[Dict]) -> pd.DataFrame:
-    """Normalize a list of incident dicts into a DataFrame with columns:
-    id, title, description, lat, lon, severity, start, end, type, source
-    This function includes heuristics for the sample schemas.
+def unify_incidents_to_df(alerts_dict):
     """
-    rows = []
-    for i, e in enumerate(raw):
-        # try common fields first
-        title = e.get("title") or e.get("event") or e.get("description") or e.get("msg") or ""
-        desc = e.get("description") or e.get("details") or e.get("msg") or ""
-        lat = e.get("lat") or e.get("latitude") or e.get("y")
-        lon = e.get("lon") or e.get("longitude") or e.get("x")
-        severity = str(e.get("severity") or e.get("level") or e.get("urgency") or "unknown").lower()
-        st = e.get("start_time") or e.get("start") or e.get("time") or e.get("timestamp")
-        end = e.get("end_time") or e.get("end")
-        typ = e.get("type") or e.get("category") or e.get("event_type") or "incident"
-        source = e.get("source") or e.get("feed") or e.get("system") or "sample"
-
-        # some samples might embed lat/lon in a 'location' object
-        if not lat and isinstance(e.get("location"), dict):
-            lat = e.get("location", {}).get("lat")
-            lon = e.get("location", {}).get("lon")
-
-        # ensure numeric coords
+    Convert incidents/roadworks JSON dict to a unified DataFrame.
+    Expected format: { "Incidents": {...}, "Roadworks": {...} }
+    """
+    dfs = []
+    for src, data in alerts_dict.items():
+        if not data:
+            continue
         try:
-            lat = float(lat) if lat is not None else None
-        except Exception:
-            lat = None
-        try:
-            lon = float(lon) if lon is not None else None
-        except Exception:
-            lon = None
+            # Queensland data is in result.records
+            records = data.get("result", {}).get("records", [])
+        except AttributeError:
+            records = data  # If it's already a list
 
-        rows.append({
-            "id": e.get("id") or f"sample-{i}",
-            "title": title,
-            "description": desc,
-            "lat": lat,
-            "lon": lon,
-            "severity": severity,
-            "start": st,
-            "end": end,
-            "type": typ,
-            "source": source,
-        })
+        if not isinstance(records, list):
+            continue
 
-    df = pd.DataFrame(rows)
-    # normalize datetimes
-    if "start" in df.columns:
-        df["start"] = pd.to_datetime(df["start"], errors="coerce")
-    if "end" in df.columns:
-        df["end"] = pd.to_datetime(df["end"], errors="coerce")
+        df = pd.DataFrame(records)
 
-    # fill missing lat/lon with NaN
-    if "lat" not in df.columns:
-        df["lat"] = None
-    if "lon" not in df.columns:
-        df["lon"] = None
+        # Normalize columns
+        df["source"] = src
+        if "created" in df.columns:
+            df["date"] = pd.to_datetime(df["created"], errors="coerce")
+        elif "last_updated" in df.columns:
+            df["date"] = pd.to_datetime(df["last_updated"], errors="coerce")
+        else:
+            df["date"] = pd.NaT
 
-    return df
+        if "start" not in df.columns:
+            df["start"] = df["date"]
+
+        if "location" not in df.columns and "region" in df.columns:
+            df["location"] = df["region"]
+
+        if "category" not in df.columns and "event_type" in df.columns:
+            df["category"] = df["event_type"]
+
+        if "severity" not in df.columns:
+            df["severity"] = "Unknown"
+
+        dfs.append(df)
+
+    if not dfs:
+        return pd.DataFrame()
+
+    df_all = pd.concat(dfs, ignore_index=True)
+    return df_all
+
