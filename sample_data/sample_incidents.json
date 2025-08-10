@@ -1,0 +1,22 @@
+{
+  "result": {
+    "records": [
+      {
+        "created": "2025-08-09T14:00:00Z",
+        "event_type": "Accident",
+        "region": "Brisbane CBD",
+        "severity": "High",
+        "details": "Two-vehicle collision causing delays.",
+        "start": "2025-08-09T13:30:00Z"
+      },
+      {
+        "created": "2025-08-08T10:15:00Z",
+        "event_type": "Breakdown",
+        "region": "M1 Pacific Motorway",
+        "severity": "Moderate",
+        "details": "Truck breakdown blocking left lane.",
+        "start": "2025-08-08T09:50:00Z"
+      }
+    ]
+  }
+}
