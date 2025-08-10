@@ -32,3 +32,15 @@ python-dotenv (manage API keys)
 
 Geopandas (optional: for shape filtering)
 
+# Incident Notifier (demo)
+
+Small Streamlit demo to visualize traffic incidents and roadworks. Works with sample data out-of-the-box.
+
+## Run locally
+
+1. Create a virtualenv and install:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+
