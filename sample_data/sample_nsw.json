@@ -1,1 +1,14 @@
 
+[
+  {
+    "id": "nsw-1",
+    "title": "Planned maintenance - Bridge St",
+    "description": "Night works - expect delays.",
+    "lat": -33.8688,
+    "lon": 151.2093,
+    "severity": "medium",
+    "start": "2025-08-10T20:00:00Z",
+    "type": "maintenance",
+    "source": "NSW-sample"
+  }
+]
