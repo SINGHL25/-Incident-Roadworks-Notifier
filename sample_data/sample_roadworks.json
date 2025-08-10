@@ -1,0 +1,24 @@
+{
+  "result": {
+    "records": [
+      {
+        "created": "2025-08-07T08:00:00Z",
+        "event_type": "Planned Maintenance",
+        "region": "Gold Coast Hwy",
+        "severity": "Low",
+        "details": "Resurfacing works, expect lane closures.",
+        "start": "2025-08-07T07:00:00Z",
+        "end": "2025-08-07T18:00:00Z"
+      },
+      {
+        "created": "2025-08-10T06:30:00Z",
+        "event_type": "Bridge Repairs",
+        "region": "Story Bridge",
+        "severity": "Moderate",
+        "details": "Night closures for maintenance.",
+        "start": "2025-08-10T22:00:00Z",
+        "end": "2025-08-11T05:00:00Z"
+      }
+    ]
+  }
+}
