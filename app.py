@@ -1,103 +1,134 @@
-import os
-import json
-from datetime import datetime, timedelta
-
 import streamlit as st
 import pandas as pd
-from dotenv import load_dotenv
+import json
+from datetime import datetime, timedelta
+from utils.api import fetch_qld_incidents, fetch_qld_roadworks
+from utils.parser import unify_incidents_to_df
 
-from utils.data_fetch import fetch_incidents
-from utils.parser import normalize_incidents
-from utils.map_plotter import create_incident_map
+# -----------------------------
+# Streamlit page config
+# -----------------------------
+st.set_page_config(
+    page_title="🚦 Incident & Roadworks Notifier",
+    layout="wide"
+)
 
-load_dotenv()
+st.title("🚦 Incident & Roadworks Notifier — QLD Live + Sample Data")
+st.markdown(
+    "Push notifications for accidents, diversions, or planned maintenance. "
+    "Data from QLD Gov Open Data feeds."
+)
 
-st.set_page_config(page_title="Incident & Roadworks Notifier", layout="wide")
-st.title("🚗 Incident & Roadworks Notifier — Local Demo")
+# -----------------------------
+# Sidebar filters
+# -----------------------------
+st.sidebar.header("Filters")
 
-st.sidebar.header("Data & Filters")
-use_live = st.sidebar.checkbox("Try live API (if configured)", value=False)
-source_choice = st.sidebar.selectbox("Default sample source", ["QLD sample", "NSW sample"])
+# Default date range: last 7 days
+today = datetime.today()
+default_start = today - timedelta(days=7)
+default_end = today
 
-# Time filters
-days = st.sidebar.slider("Show last N days", 1, 30, 7)
-min_severity = st.sidebar.selectbox("Minimum severity", ["any", "low", "medium", "high"])
+start_date = st.sidebar.date_input("Start date", default_start)
+end_date = st.sidebar.date_input("End date", default_end)
 
-st.sidebar.markdown("---")
-if st.sidebar.button("Reload data"):
-    st.experimental_rerun()
+min_severity = st.sidebar.selectbox(
+    "Minimum severity",
+    options=["any", "Low", "Moderate", "High", "Severe"],
+    index=0
+)
 
-# Upload support
-uploaded_files = st.sidebar.file_uploader("Upload incident JSON files (optional)", type=["json"], accept_multiple_files=True)
+data_source_choice = st.sidebar.multiselect(
+    "Data sources",
+    ["Incidents", "Roadworks"],
+    default=["Incidents", "Roadworks"]
+)
 
-@st.cache_data(ttl=120)
-def load_data(use_live, source_choice, uploaded_files):
-    # Try uploaded files first
-    combined = []
-    if uploaded_files:
-        for up in uploaded_files:
-            try:
-                j = json.load(up)
-                combined.extend(j if isinstance(j, list) else [j])
-            except Exception:
-                continue
+# Convert to datetime for filtering
+start_ts = datetime.combine(start_date, datetime.min.time())
+end_ts = datetime.combine(end_date, datetime.max.time())
+
+# -----------------------------
+# Data fetching
+# -----------------------------
+st.info("Fetching data...")
+alerts_dict = {}
+
+try:
+    if "Incidents" in data_source_choice:
+        alerts_dict["Incidents"] = fetch_qld_incidents()
+    if "Roadworks" in data_source_choice:
+        alerts_dict["Roadworks"] = fetch_qld_roadworks()
+except Exception as e:
+    st.error(f"Live fetch failed: {e} — using sample data.")
+    # Fallback to local sample files
+    try:
+        if "Incidents" in data_source_choice:
+            alerts_dict["Incidents"] = json.load(open("sample_data/sample_incidents.json"))
+        if "Roadworks" in data_source_choice:
+            alerts_dict["Roadworks"] = json.load(open("sample_data/sample_roadworks.json"))
+    except FileNotFoundError as fe:
+        st.error(f"Sample data missing: {fe}")
+        alerts_dict = {}
+
+# -----------------------------
+# Data parsing
+# -----------------------------
+if alerts_dict:
+    df = unify_incidents_to_df(alerts_dict)
+
+    # Ensure datetime columns are parsed safely
+    for col in ["start", "end", "date"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
+    # Filter by date range
+    df_filtered = df.copy()
+    if "start" in df_filtered.columns:
+        df_filtered = df_filtered[
+            (df_filtered["start"].isna()) | (df_filtered["start"] >= start_ts)
+        ]
+    if "end" in df_filtered.columns:
+        df_filtered = df_filtered[
+            (df_filtered["end"].isna()) | (df_filtered["end"] <= end_ts)
+        ]
+
+    # Filter by severity
+    if min_severity != "any" and "severity" in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered["severity"] == min_severity]
+
+    # -----------------------------
+    # Summary section
+    # -----------------------------
+    st.subheader("Summary of Alerts")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Files processed", len(alerts_dict))
+    col2.metric("Total alerts", len(df_filtered))
+    col3.metric("Unique areas", df_filtered["location"].nunique() if "location" in df_filtered else 0)
+    col4.metric("Data period", f"{start_date} to {end_date}")
+
+    # -----------------------------
+    # Event details
+    # -----------------------------
+    st.subheader("Event Details Table")
+    st.dataframe(df_filtered, use_container_width=True)
+
+    # -----------------------------
+    # Charts
+    # -----------------------------
+    if not df_filtered.empty:
+        st.subheader("Top Event Counts")
+        if "category" in df_filtered.columns:
+            st.bar_chart(df_filtered["category"].value_counts())
+        elif "type" in df_filtered.columns:
+            st.bar_chart(df_filtered["type"].value_counts())
+
+        st.subheader("Events Over Time")
+        if "date" in df_filtered.columns:
+            df_time = df_filtered.groupby(df_filtered["date"].dt.date).size()
+            st.line_chart(df_time)
     else:
-        # fetch (tries live if requested, otherwise sample)
-        combined = fetch_incidents(use_live=use_live, prefer=source_choice)
-    return combined
-
-raw = load_data(use_live, source_choice, uploaded_files)
-
-if not raw:
-    st.warning("No data loaded — try unchecking 'Try live API' or upload a sample JSON file.")
-    st.stop()
-
-# Normalize
-df = normalize_incidents(raw)
-if df.empty:
-    st.warning("Parsed data is empty after normalization.")
-    st.stop()
-
-# Apply filters
-now = datetime.utcnow()
-start_ts = now - pd.Timedelta(days=days)
-
-# ensure date column is datetime
-if "start" in df.columns:
-    df["start"] = pd.to_datetime(df["start"], errors="coerce")
+        st.warning("No alerts match the selected filters.")
 else:
-    df["start"] = pd.NaT
+    st.warning("No data to display. Please check your data sources or sample files.")
 
-df_filtered = df.copy()
-if min_severity != "any":
-    df_filtered = df_filtered[df_filtered["severity"].str.lower().isin([min_severity])]
-
-if "start" in df_filtered.columns:
-    df_filtered = df_filtered[(df_filtered["start"].isna()) | (df_filtered["start"] >= start_ts)]
-
-st.sidebar.markdown(f"**Loaded events:** {len(df)} — Showing: {len(df_filtered)}")
-
-# Layout
-col1, col2 = st.columns((1, 2))
-
-with col1:
-    st.subheader("Filters & Table")
-    if st.checkbox("Show raw DataFrame"):
-        st.dataframe(df_filtered)
-
-    csv = df_filtered.to_csv(index=False)
-    st.download_button("Export CSV", data=csv, file_name="incidents.csv", mime="text/csv")
-
-    st.markdown("---")
-    st.subheader("Top event types")
-    st.bar_chart(df_filtered["type"].value_counts())
-
-with col2:
-    st.subheader("Map")
-    folium_map = create_incident_map(df_filtered)
-    from streamlit_folium import folium_static
-    folium_static(folium_map, width=900)
-
-st.markdown("---")
-st.subheader("Notes")
-st.markdown("App uses sample JSON data if no live API configured. Drop JSON files exported from your source to test multiple-file parsing.")
